@@ -72,3 +72,43 @@ html:not(.js-ready) body:has(#page-admin-requests:target,#page-admin-requests :t
  .password-control{flex-direction:column}
  .modal-card{padding:20px}
 }
+
+/* Full-page account entry. */
+.auth-page .top,.auth-page nav,.auth-page [data-session-hint],.auth-page .prototype-links{display:none!important}
+.auth-page .layout{display:block;min-height:100dvh}
+.auth-page main{padding:0;max-width:none}
+.auth-page .auth-view:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100dvh}
+.auth-intro{padding:clamp(30px,6vw,90px);background:#103f30;color:#effbf2;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.auth-brand{font-size:26px;font-weight:750;color:#c6f2d3;margin-bottom:60px}
+.auth-intro h2{font-size:clamp(36px,4.4vw,68px);letter-spacing:-2px;line-height:1.12}
+.auth-intro p{color:#b6d7c3;max-width:340px}
+.auth-bicycle{font-size:clamp(70px,10vw,150px);color:#9ccd9f;margin-top:45px;white-space:nowrap}
+.auth-content{display:grid;place-items:center;padding:40px 28px;background:#f8faf9}
+.auth-form{width:100%;max-width:460px}
+.auth-form h1{font-size:34px}
+.auth-form form{margin-top:30px}
+.auth-form .back{margin-top:24px}
+.parking-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,1fr);gap:24px;align-items:start}
+.parking-map{position:relative;aspect-ratio:1;max-width:760px;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:#edf2ec}
+.parking-map.satellite{background:url('images/parking-aerial.png') center/100% 100% no-repeat}
+.building{position:absolute;background:#c0cac3;pointer-events:none;border:1px solid #adbbb1}
+.building-left{left:3%;top:3%;width:49%;height:91%;clip-path:polygon(0 0,100% 0,100% 17%,35% 17%,35% 100%,0 100%)}
+.building-right{right:3%;top:3%;width:46%;height:94%;clip-path:polygon(68% 0,100% 0,100% 100%,0 100%,0 81%,68% 81%)}
+.satellite .building{display:none}
+.parking-marker{position:absolute;transform:translate(-50%,-50%);padding:5px 3px;width:14%;min-width:42px;white-space:pre-line;line-height:1.25;font-size:clamp(10px,1.15vw,15px);border:1px solid #6b7e70;border-radius:12px;box-shadow:0 2px 7px #0002;color:#142a20}
+.parking-marker.has-free{background:#d6f2c9}.parking-marker.is-full{background:#d2d6d2}
+.parking-marker[aria-pressed="true"]{outline:3px solid #08643f;outline-offset:2px}
+.parking-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.parking-list-button{justify-content:start;text-align:left;font-size:14px}
+.parking-list-button[aria-pressed="true"],[data-map-mode][aria-pressed="true"]{background:#dff0e4;border-color:var(--green)}
+.map-legend{display:flex;flex-wrap:wrap;gap:22px;font-size:14px}
+.parking-info{max-height:620px;overflow:auto}
+.spot-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px}
+.camera-preview{background:#eaf1ed;border:1px dashed #a4b9ac;border-radius:12px;min-height:250px;display:grid;place-items:center;overflow:hidden;margin-bottom:20px;text-align:center;padding:12px}
+.camera-preview video{width:100%;max-height:420px;object-fit:contain;border-radius:8px;background:#13281e}
+@media(max-width:900px){.parking-layout{grid-template-columns:1fr}.parking-info{max-height:none}.parking-marker{font-size:12px}}
+@media(max-width:650px){.auth-page .auth-view:not([hidden]){grid-template-columns:1fr}.auth-intro{padding:25px 24px}.auth-brand{margin-bottom:20px;font-size:22px}.auth-intro h2{font-size:32px;letter-spacing:-1px;margin:0}.auth-intro p{margin:12px 0 0}.auth-bicycle{display:none}.auth-content{padding:30px 24px}.auth-form h1{font-size:28px}.parking-marker{font-size:10px;border-radius:8px}.camera-preview{min-height:190px}.spot-row{flex-wrap:wrap}}
+
+.view h1[tabindex="-1"]:focus{outline:none}
+.auth-bicycle{width:100%;max-width:360px;height:auto}
+.parking-layout{margin-bottom:24px}

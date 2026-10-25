@@ -19,11 +19,28 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
       server.once('exit', code => reject(new Error(`Static preview exited: ${code}`)));
     });
   }
-  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+  const browser = await chromium.launch({ headless: true, channel: 'msedge', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const errors = [];
   let requests = 0;
   const page = await browser.newPage();
   page.setDefaultTimeout(6000);
+  // Deterministic virtual video; physical-device availability is outside this test.
+  await page.addInitScript(() => {
+    if (!navigator.mediaDevices) return;
+    navigator.mediaDevices.getUserMedia = async constraints => {
+      if (constraints.audio !== false || !constraints.video) throw new Error('Unexpected media constraints');
+      const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 240;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#fff'; context.fillRect(0, 0, 320, 240);
+      context.fillStyle = '#143d2d'; context.fillRect(50, 50, 100, 100);
+      const stream = canvas.captureStream(15);
+      const timer = setInterval(() => {
+        if (stream.getVideoTracks()[0].readyState === 'ended') { clearInterval(timer); return; }
+        context.fillRect(50, 50, 100, 100);
+      }, 60);
+      return stream;
+    };
+  });
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => {
     if (['fetch', 'xhr'].includes(request.resourceType())) requests++;
@@ -111,7 +128,7 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
     await page.locator('[data-toggle-password="login-password"]').click();
     assert.equal(await page.locator('#login-password').getAttribute('type'), 'text');
     await page.locator('#account-login').getByRole('link', { name: 'Зарегистрироваться', exact: true }).click();
-    await page.locator('#account-register[open]').waitFor();
+    await page.locator('#account-register:visible').waitFor();
     await page.waitForFunction(() => document.querySelector('#login-password').value === '');
     await page.locator('#register-last-name').fill('Иванов');
     await page.locator('#register-first-name').fill('Иван');
@@ -122,7 +139,7 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
     assert.equal(await page.locator('#page-profile [name="display_name"]').inputValue(), 'Иванов Иван');
     assert.equal(await page.locator('#page-profile [name="telegram"]').inputValue(), '@demo_user');
     await page.waitForFunction(() => document.querySelector('#register-password').value === '');
-    await page.getByRole('link', { name: 'Изменить логин и пароль', exact: true }).click();
+    await page.getByRole('link', { name: 'Изменить пароль', exact: true }).click();
     await page.locator('#account-settings[open]').waitFor();
     await page.locator('#account-settings-new').fill('ui-test-password');
     await page.locator('#account-settings-confirm').fill('another-password');
@@ -144,15 +161,63 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
     await page.goBack();
     assert.equal(await page.locator('[name="model"]:visible').inputValue(), 'Unsaved draft');
     const png = await page.screenshot({ clip: { x: 0, y: 0, width: 10, height: 10 } });
-    await page.locator('[name="photo"]').setInputFiles({ name: 'preview.png', mimeType: 'image/png', buffer: png });
+    await page.locator('#page-register [name="photo"]').setInputFiles({ name: 'preview.png', mimeType: 'image/png', buffer: png });
     await page.locator('.file-preview:visible').waitFor();
     await page.waitForFunction(() => document.querySelector('#page-register .file-preview').naturalWidth > 0);
     assert.ok(await page.locator('#page-register .file-preview').evaluate(image => image.complete && image.naturalWidth > 0));
-    await page.locator('[name="photo"]').setInputFiles({ name: 'large.png', mimeType: 'image/png', buffer: Buffer.alloc(2 * 1024 * 1024 + 1) });
+    await page.locator('#page-register [name="photo"]').setInputFiles({ name: 'large.png', mimeType: 'image/png', buffer: Buffer.alloc(2 * 1024 * 1024 + 1) });
     assert.ok(await page.locator('#page-register .file-preview').isHidden());
-    assert.equal(await page.locator('[name="photo"]').evaluate(input => input.files.length), 0);
+    assert.equal(await page.locator('#page-register [name="photo"]').evaluate(input => input.files.length), 0);
+    // Full-page authentication, immutable login, map selection and camera capture.
+    await route('#account-register');
+    assert.ok(await page.locator('.top').isHidden());
+    assert.equal(await page.locator('dialog#account-register').count(), 0);
+    assert.equal(await page.locator('#account-settings [name="username"]').count(), 0);
+    await route('#page-register');
+    await page.locator('#page-register [data-place-picker]').click();
+    await page.locator('#page-map [data-parking-id="p1"]').first().click();
+    assert.equal(await page.locator('#page-map .spot-row button').count(), 0);
+    await page.locator('#page-map [data-parking-id="p6"]').first().click();
+    assert.equal(await page.locator('#page-map .spot-row button').count(), 2);
+    await page.locator('#page-map .spot-row button').first().click();
+    await page.waitForURL('**/#page-register');
+    assert.equal(await page.locator('#page-register [name="target_spot_id"]').inputValue(), 'p6-s11');
+    assert.equal(await page.locator('#page-register [name="model"]').inputValue(), 'Unsaved draft');
+    await route('#page-map');
+    await page.locator('#page-map [data-map-mode="satellite"]').click();
+    assert.ok(await page.locator('#page-map .parking-map').evaluate(item => item.classList.contains('satellite')));
+    for (const scanPage of ['page-scan', 'page-admin-scan']) {
+      await route(`#${scanPage}`);
+      const panel = page.locator(`#${scanPage} [data-scanner]`);
+      await panel.locator('[data-camera-start]').click();
+      try { await panel.locator('[data-camera-capture]:enabled').waitFor(); }
+      catch { throw new Error(`${scanPage}: ${await panel.locator('[data-camera-status]').textContent()}`); }
+      await page.waitForFunction(id => document.querySelector(`#${id} video`).videoWidth > 0, scanPage);
+      await panel.locator('[data-camera-capture]').click();
+      await panel.locator('[data-scan-preview]:visible').waitFor();
+      assert.equal(await panel.locator('[name="photo"]').evaluate(input => input.files[0].name), 'qr-camera.jpg');
+      assert.ok(await panel.locator('video').evaluate(video => video.srcObject === null));
+      assert.ok(await panel.locator('[type="submit"]').isDisabled());
+    }
+    await page.evaluate(() => { window.originalMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError')); });
+    await page.locator('#page-admin-scan [data-camera-start]').click();
+    await page.locator('#page-admin-scan [data-camera-status]').filter({ hasText: 'Доступ к камере запрещён' }).waitFor();
+    await page.evaluate(() => { navigator.mediaDevices.getUserMedia = window.originalMedia; });
+    await page.screenshot({ path: 'test-results/final-photo-desktop.png', fullPage: true });
+    assert.equal(await page.evaluate(() => typeof window.jsQR), 'undefined');
     assert.equal(requests, 0, 'unconfigured UI sends no requests');
     assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
+    let uploaded;
+    await page.route('**/ui-test-photo', async route => {
+      uploaded = route.request().postDataBuffer().toString('latin1');
+      await route.fulfill({ status: 204 });
+    });
+    await page.evaluate(() => { Veloregistry.connectForm('admin-qr-scan', { url: '/ui-test-photo', encoding: 'form-data' }); });
+    await page.locator('#page-admin-scan [type="submit"]').click();
+    await page.locator('#page-admin-scan [role="status"]').filter({ hasText: 'Запрос выполнен сервером.' }).waitFor();
+    assert.ok(uploaded.includes('name="photo"; filename="qr-camera.jpg"'));
+    assert.ok(!uploaded.includes('name="camera_photo"'));
+
 
     // Test only the CLIENT adapter, with intercepted responses; no backend is created.
     let body;
@@ -183,11 +248,16 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
     fs.mkdirSync('test-results', { recursive: true });
     await route('#account-login');
     await page.screenshot({ path: 'test-results/ui-login-desktop.png', fullPage: true });
+    await route('#account-register');
+    await page.screenshot({ path: 'test-results/final-register-desktop.png', fullPage: true });
+    await route('#page-map');
+    await page.screenshot({ path: 'test-results/final-map-desktop.png', fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
-    for (const id of ['account-login', 'account-register', 'account-settings', 'page-requests', 'page-bikes']) {
+    for (const id of ['account-login', 'account-register', 'account-settings', 'page-requests', 'page-bikes', 'page-map', 'page-admin-parking-map']) {
       await route(`#${id}`);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `mobile width: ${id}`);
     }
+    await page.screenshot({ path: 'test-results/final-map-mobile.png', fullPage: true });
     await route('#account-register');
     await page.screenshot({ path: 'test-results/ui-register-mobile.png', fullPage: true });
     await page.evaluate(() => { location.hash = '#bad-fragment'; });
@@ -196,14 +266,14 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
     const offline = await browser.newPage();
     offline.on('pageerror', error => errors.push(error.message));
     await offline.goto(pathToFileURL(path.resolve('frontend/index.html')).href + '#account-login');
-    await offline.locator('#account-login[open]').waitFor();
+    await offline.locator('#account-login:visible').waitFor();
     await offline.close();
     const noJs = await browser.newPage({ javaScriptEnabled: false });
     await noJs.goto(base + '/#page-bikes');
     assert.ok(await noJs.locator('#page-bikes').isVisible());
     await noJs.close();
     assert.deepEqual(errors, []);
-    console.log('PASS: screens and dialogs, history/focus/Escape/backdrop, bicycle context, filters, auth forms, local previews, drafts, mobile, file://, CSS fallback. No requests before configuration. JSON adapter checked with intercepted responses only.');
+    console.log('PASS: full-page auth, immutable login, map/places/return to draft, virtual camera capture/stop/denial, multipart photo upload with intercepted response, no client QR decoding, navigation, admin requests, mobile/file/CSS fallback. No API requests before configuration.');
   } finally {
     await browser.close();
     server?.kill();

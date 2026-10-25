@@ -53,6 +53,8 @@
     const dialog = target.matches('.modal-target') ? target : null;
     const previousPage = activePage;
     const previousDialog = activeDialog;
+    if (previousPage?.classList.contains("auth-view") && previousPage !== page) clearSecrets(previousPage);
+    document.body.classList.toggle("auth-page", page.classList.contains("auth-view"));
     if (previousDialog && previousDialog !== dialog) previousDialog.close();
     for (const item of pages) item.hidden = item !== page;
     const admin = page.classList.contains('admin-view');
@@ -81,6 +83,7 @@
     activePage = page;
     activeDialog = dialog;
     document.body.classList.toggle('modal-open', Boolean(dialog));
+    document.dispatchEvent(new CustomEvent('veloregistry:route', { detail: { page: page.id, target: target.id } }));
     document.title = `${dialog?.querySelector('h2')?.textContent || page.querySelector('h1').textContent} — Велореестр`;
     if (dialog) {
       if (!dialog.open) dialog.showModal();
@@ -137,6 +140,12 @@
       event.preventDefault();
       if (form.dataset.demoAuth && form.reportValidity()) {
         // A requested UI walkthrough, not authentication. Never store a password.
+        if (form.dataset.demoAuth === 'settings') {
+          clearSecrets(form);
+          document.querySelector('[data-session-hint]').textContent = 'Демо: форма смены пароля проверена. Пароль не сохранялся.';
+          location.hash = '#page-profile';
+          return;
+        }
         const fields = new FormData(form);
         const username = fields.get('username').trim();
         const firstName = String(fields.get('first_name') || '').trim();
@@ -150,7 +159,7 @@
         document.querySelector('[data-account-label]').textContent = displayName;
         document.querySelector('[data-session-hint]').textContent = 'Демонстрационный режим. Данные временные и исчезнут после перезагрузки.';
         document.querySelector('#login-username').value = username;
-        document.querySelector('#account-settings-username').value = username;
+
         location.hash = '#page-profile';
       }
     });
@@ -175,20 +184,18 @@
       confirmation.addEventListener('input', validate);
     }
   }
-  for (const dialog of dialogs) {
-    dialog.addEventListener('close', () => {
-      for (const input of dialog.querySelectorAll('[data-secret]')) {
-        input.value = '';
-        input.type = 'password';
-        input.setCustomValidity('');
-        if (input.name === 'password_confirm') input.required = dialog.id === 'account-register';
-      }
-      for (const button of dialog.querySelectorAll('[data-toggle-password]')) {
-        button.textContent = 'Показать пароль';
-        button.setAttribute('aria-pressed', 'false');
-      }
-    });
+  function clearSecrets(container) {
+    for (const input of container.querySelectorAll('[data-secret]')) {
+      input.value = '';
+      input.type = 'password';
+      input.setCustomValidity('');
+    }
+    for (const button of container.querySelectorAll('[data-toggle-password]')) {
+      button.textContent = 'Показать пароль';
+      button.setAttribute('aria-pressed', 'false');
+    }
   }
+  for (const dialog of dialogs) dialog.addEventListener('close', () => clearSecrets(dialog));
 
   function filterRequests() {
     const filter = document.querySelector('[name="request-filter"]:checked').value;
@@ -212,7 +219,7 @@
   requestType.addEventListener('change', updateRequestFields);
 
 
-  for (const input of document.querySelectorAll('input[type="file"]')) {
+  for (const input of document.querySelectorAll('.upload input[type="file"][name="photo"]')) {
     const container = input.closest('.upload, .scanner-panel');
     const preview = document.createElement('img');
     preview.className = 'file-preview';

@@ -43,6 +43,7 @@
       if (busy || !form.reportValidity()) return;
       const fields = new FormData(form);
       fields.delete('password_confirm');
+      if (form.matches('[data-scanner]')) fields.delete('camera_photo');
       fields.delete('spot_code'); // Display label; server needs the selected place ID.
       if (form.dataset.bikeId) fields.set('bike_id', form.dataset.bikeId);
       busy = true;
