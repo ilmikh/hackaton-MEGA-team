@@ -14,8 +14,8 @@
 |---|---|
 | account-login | username, password |
 | account-register | last_name, first_name, username, password |
-| account-settings / admin-account-settings | username, current_password, new_password (необязательно), password_confirm (только для проверки интерфейса) |
-| profile / admin-profile | display_name, contact_type, contact_value |
+| account-settings | username, current_password, new_password (необязательно), password_confirm (только для проверки интерфейса) |
+| profile | display_name, phone, telegram |
 | bike-register | photo, model, color, special_marks, target_spot_id |
 | bike-edit / admin-bike-edit | model, color, special_marks; bike_id из выбранной карточки |
 | request-create | request_type (place/move/release), bike_id, target_spot_id, comment |
@@ -64,3 +64,5 @@ ID попадает в hidden `target_spot_id`, подпись — в интер
 ## Административные экраны
 
 `#page-admin-map` теперь показывает список всех демонстрационных велосипедов без карты. Поиск работает по номеру, модели, цвету, владельцу и контакту; каждая карточка ведёт к своему экрану. `#page-admin-requests` содержит фильтр по состоянию и подробности. Кнопки решения меняют только DOM: отклонение требует причины, повторное решение отключено. После перезагрузки восстанавливаются примеры. Запросы API не выполняются; реальные решения, список и права подключаются отдельно.
+
+Профиль содержит отдельные поля phone и telegram; Telegram вводится с @. Административного экрана собственного профиля нет, вход в административный макет ведёт к реестру велосипедов.

@@ -57,7 +57,7 @@
     for (const item of pages) item.hidden = item !== page;
     const admin = page.classList.contains('admin-view');
     document.body.dataset.interface = admin ? 'admin' : 'resident';
-    document.querySelector('.brand').href = admin ? '#page-admin-profile' : '#page-profile';
+    document.querySelector('.brand').href = admin ? '#page-admin-map' : '#page-profile';
     for (const link of document.querySelectorAll('nav a')) {
       const current = link.hash === `#${page.dataset.nav || page.id}`;
       link.classList.toggle('active', current);
@@ -146,9 +146,7 @@
           profile.elements.namedItem('display_name').value || username :
           [lastName, firstName].filter(Boolean).join(' ') || username;
         profile.elements.namedItem('display_name').value = displayName;
-        profile.elements.namedItem('contact_type').value = 'telegram';
-        profile.elements.namedItem('contact_type').dispatchEvent(new Event('change'));
-        profile.elements.namedItem('contact_value').value = username;
+        profile.elements.namedItem('telegram').value = username.startsWith('@') ? username : `@${username}`;
         document.querySelector('[data-account-label]').textContent = displayName;
         document.querySelector('[data-session-hint]').textContent = 'Демонстрационный режим. Данные временные и исчезнут после перезагрузки.';
         document.querySelector('#login-username').value = username;
@@ -213,17 +211,6 @@
   }
   requestType.addEventListener('change', updateRequestFields);
 
-  for (const select of document.querySelectorAll('[name="contact_type"]')) {
-    const input = select.form.elements.namedItem('contact_value');
-    const update = () => {
-      const phone = select.value === 'phone';
-      input.type = phone ? 'tel' : 'text';
-      input.placeholder = phone ? '+7 (999) 123-45-67' : '@username';
-      input.autocomplete = phone ? 'tel' : 'off';
-    };
-    select.addEventListener('change', update);
-    update();
-  }
 
   for (const input of document.querySelectorAll('input[type="file"]')) {
     const container = input.closest('.upload, .scanner-panel');

@@ -37,7 +37,6 @@ html:not(.js-ready) body:has(#page-edit-bike:target,#page-edit-bike :target) nav
 html:not(.js-ready) body:has(#page-scan:target,#page-scan :target) nav a[href="#page-scan"]{background:#e5f3e9;color:#085d3a;font-weight:700}
 html:not(.js-ready) body:has(#page-map:target,#page-map :target) nav a[href="#page-map"]{background:#e5f3e9;color:#085d3a;font-weight:700}
 html:not(.js-ready) body:has(#page-requests:target,#page-requests :target) nav a[href="#page-requests"]{background:#e5f3e9;color:#085d3a;font-weight:700}
-html:not(.js-ready) body:has(#page-admin-profile:target,#page-admin-profile :target) nav a[href="#page-admin-profile"]{background:#e5f3e9;color:#085d3a;font-weight:700}
 html:not(.js-ready) body:has(#page-admin-map:target,#page-admin-map :target) nav a[href="#page-admin-map"]{background:#e5f3e9;color:#085d3a;font-weight:700}
 html:not(.js-ready) body:has(#page-admin-bike:target,#page-admin-bike :target) nav a[href="#page-admin-map"]{background:#e5f3e9;color:#085d3a;font-weight:700}
 html:not(.js-ready) body:has(#page-admin-edit-bike:target,#page-admin-edit-bike :target) nav a[href="#page-admin-map"]{background:#e5f3e9;color:#085d3a;font-weight:700}
