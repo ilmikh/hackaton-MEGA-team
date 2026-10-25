@@ -1,5 +1,5 @@
 import {api,demo,ApiError} from "./api.js";
-import {Scanner,parseQr} from "./scanner.js";
+import {Scanner} from "./scanner.js";
 const root=document.querySelector("#app"), dialog=document.querySelector("#modal");
 const cfg=window.VELO_CONFIG || {};
 const e=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -43,7 +43,7 @@ async function bikePage(id,admin=false){
  return link(admin?"/admin/bikes":"/bikes","← Назад к велосипедам","back")+page(b.public_number+" · "+b.model,'<div class="detail-grid"><section class="panel">'+photo(b)+'</section><div><section class="panel"><h2>Информация о велосипеде</h2>'+badge(b)+'<dl><dt>Модель</dt><dd>'+e(b.model)+'</dd><dt>Цвет</dt><dd>'+e(b.color)+'</dd><dt>Особые приметы</dt><dd>'+e(b.special_marks||"Не указаны")+'</dd><dt>Парковка</dt><dd>'+e(b.parking_name||"Не закреплена")+'</dd><dt>Место</dt><dd>'+e(b.spot_code||"Нет")+'</dd></dl></section>'+owner+'<section class="panel stack"><h2>Действия</h2>'+action("show-qr","Мой QR","primary",'data-id="'+e(id)+'" data-admin="'+admin+'" '+(b.review_state!=="approved"?"disabled":""))+action("edit-bike","Изменить описание","secondary",'data-id="'+e(id)+'" data-admin="'+admin+'" '+(b.review_state==="pending"?"disabled":""))+action("request","Добавить заявку","secondary",'data-id="'+e(id)+'"')+'</section></div></div>');
 }
 function registration(){return page("Зарегистрировать велосипед",'<form id="register-form">'+formError()+'<section class="panel register-grid"><label class="upload">Фото велосипеда <span id="photo-preview">'+(draftPhoto?'<span>Выбрано: '+e(draftPhoto.name)+'</span>':bikeIcon)+'</span><input name="photo" id="bike-photo" type="file" accept="image/jpeg,image/png,image/webp" '+(!draftPhoto?"required":"")+'><small>JPG, PNG, WebP до 2 МБ</small></label><div class="stack"><label>Модель<input name="model" required maxlength="120" value="'+e(draft.model)+'" placeholder="Например, Stels Navigator"></label><label>Цвет<input name="color" required maxlength="80" value="'+e(draft.color)+'" placeholder="Например, сине-белый"></label><label>Особые приметы <small>(необязательно)</small><textarea name="special_marks" maxlength="500" rows="3">'+e(draft.special_marks)+'</textarea></label></div></section><section class="panel"><h2>Парковочное место</h2><p id="selected-place">'+(selectedSpot?e(selectedSpot.parking_name+" · "+selectedSpot.code):"Место ещё не выбрано")+'</p>'+action("pick-place",selectedSpot?"Изменить место на карте":"Выбрать место на карте")+'<p class="hint">На карте выбираются только свободные места. Регистрацию и место подтвердит администратор.</p></section><section class="panel"><p>Владелец: <strong>'+e(me.display_name)+'</strong> · '+contact(me)+'</p><div class="actions"><button type="submit" class="primary">Отправить на регистрацию</button>'+link("/bikes","Отмена","button secondary")+'</div></section></form>');}
-function scannerPage(){return page("Сканировать QR",'<p class="muted">Велосипед или парковка</p><section class="panel scanner-panel"><div class="video-frame"><video id="camera" playsinline muted aria-label="Камера для сканирования QR"></video><span>Наведите камеру на QR</span></div><p id="scan-error" class="form-error" role="alert" hidden></p><div class="actions">'+action("start-camera","Включить камеру","primary")+action("stop-camera","Выключить камеру")+ '<label class="button secondary">Загрузить фото QR<input class="visually-hidden" type="file" id="qr-photo" accept="image/png,image/jpeg,image/webp"></label></div><p class="hint">Камера работает через HTTPS или localhost. Для фото камера не нужна.</p><form id="qr-link-form" class="qr-link"><label>Или вставьте ссылку QR<input name="url" type="url" required placeholder="https://ваш-сайт/q/b/…"></label><button class="secondary" type="submit">Проверить</button></form>'+(demo?'<p class="hint">Демо: '+e(location.origin+'/q/b/demo-bike-014')+'</p>':"")+'</section>');}
+function scannerPage(){return page("Сканировать QR",'<p class="muted">Велосипед или парковка</p><section class="panel scanner-panel"><div class="video-frame"><video id="camera" playsinline muted aria-label="Камера для снимка QR"></video><span>Наведите камеру на QR</span></div><p id="scan-error" class="form-error" role="alert" hidden></p><div class="actions">'+action("start-camera","Включить камеру","primary")+action("capture-qr","Сфотографировать QR")+action("stop-camera","Выключить камеру")+'<label class="button secondary">Загрузить фото QR<input class="visually-hidden" type="file" id="qr-photo" accept="image/png,image/jpeg,image/webp"></label></div><p class="hint">Снимок будет отправлен на сервер для распознавания. Камера работает через HTTPS или localhost.</p><form id="qr-link-form" class="qr-link"><label>Или вставьте ссылку QR<input name="url" type="url" required placeholder="https://ваш-сайт/q/b/…"></label><button class="secondary" type="submit">Проверить</button></form>'+(demo?'<p class="hint">Для распознавания и получения QR требуется подключённый бэк.</p>':"")+'</section>');}
 async function ownerPage(id){const u=await api.user(id);if(!u)throw new ApiError("Пользователь не найден.",404);
  return page("Профиль владельца",'<div class="detail-grid"><section class="panel"><h2>'+e(u.display_name)+'</h2><p>'+contact(u)+'</p></section><section class="panel"><h2>Проживание · ЛКП</h2><dl><dt>Общежитие</dt><dd>'+e(u.dormitory_name||"Нет данных из ЛКП")+'</dd><dt>Комната</dt><dd>'+e(u.room_number||"Нет данных из ЛКП")+'</dd></dl><p class="hint">Импортируется из ЛКП. Только для администратора.</p><p>'+e(u.lkp_synced_at ? "Обновлено: "+new Date(u.lkp_synced_at).toLocaleString("ru-RU") : "ЛКП пока не подключён")+'</p></section></div>');
 }
@@ -72,26 +72,30 @@ async function render(){
  }catch(err){html=page("Не удалось открыть страницу",'<div class="panel"><p role="alert">'+e(err.message)+'</p>'+action("retry","Повторить")+'</div>');}
  if(ticket!==version)return;
  document.querySelector("#main").innerHTML=html;
- if(path==="/scan"){scanner=new Scanner(document.querySelector("#camera"),handleQr,scanError);}
+ if(path==="/scan"){scanner=new Scanner(document.querySelector("#camera"),handleImage,scanError);}
  document.title=(document.querySelector("h1")?.textContent||"Велореестр")+" · Велореестр";
 }
 function scanError(message){const box=document.querySelector("#scan-error");if(box){box.textContent=message;box.hidden=false;}else notify(message);}
-async function handleQr(text){
+async function qrOperation(operation){
  if(lookupBusy||dialog.open)return;lookupBusy=true;const ticket=version;scanner?.stop();
+ const box=document.querySelector("#scan-error");if(box)box.hidden=true;
+ document.querySelectorAll('[data-action="capture-qr"], #qr-link-form button').forEach(b=>b.disabled=true);
  try {
-  const result=parseQr(text,cfg.publicOrigin||location.origin);
-  if(result.kind==="p"){handoffTo(isAdmin()?"/admin/map":"/map",{qrToken:result.token});return;}
-  const b=await (isAdmin()?api.adminLookup(result.token):api.lookup(result.token));
+  const result=await operation();
   if(ticket!==version)return;
-  const owner=b.owner || {};
+  if(result.kind==="parking"){handoffTo(isAdmin()?"/admin/map":"/map",{parkingId:result.parking_id});return;}
+  if(result.kind!=="bike" || !result.bike)throw Error("Сервер вернул неподдерживаемый результат QR.");
+  const b=result.bike,owner=b.owner || {};
   let content='<p class="eyebrow">'+(isAdmin()?"Административный просмотр":"Связь с владельцем")+'</p>';
   if(isAdmin())content+='<div class="modal-grid">'+photo(b)+'<div><p><strong>'+e(b.model)+'</strong></p><p>'+e(b.status_label)+'</p><p>'+e(owner.display_name||"Владелец не установлен")+'</p><p>'+contact(owner)+'</p><p>Место: '+e(b.spot_code||"Без места")+'</p><p>Комната: '+e(owner.room_number||"Нет данных из ЛКП")+'</p></div></div>';
   else content+='<h3>'+e(owner.display_name||"Владелец не установлен")+'</h3><p>'+contact(owner)+'</p>';
   content+='<div class="actions">'+(isAdmin()?link("/admin/bikes/"+encodeURIComponent(b.id),"Открыть полную карточку","button primary"):"")+action("rescan","Сканировать ещё")+'</div>';
   modal("Велосипед "+b.public_number,content);
  }catch(err){if(ticket===version)scanError(err.message);}
- finally{if(ticket===version)lookupBusy=false;}
+ finally{if(ticket===version){lookupBusy=false;document.querySelectorAll('[data-action="capture-qr"], #qr-link-form button').forEach(b=>b.disabled=false);}}
 }
+async function handleImage(file){return qrOperation(()=>api.scanPhoto(file,isAdmin()));}
+async function handleQr(url){return qrOperation(()=>api.resolveQrUrl(url,isAdmin()));}
 function readDraft(){const form=document.querySelector("#register-form");if(form){const data=new FormData(form);draft={model:data.get("model"),color:data.get("color"),special_marks:data.get("special_marks")};}}
 function handoffTo(path,context={}) {
  const event=new CustomEvent("velo:navigate",{cancelable:true,detail:{path,context}});
@@ -122,17 +126,17 @@ document.addEventListener("click",async event=>{
    case "close":closeModal();break;
    case "retry":render();break;
    case "start-camera":closeModal();document.querySelector("#scan-error").hidden=true;await scanner?.start();break;
+   case "capture-qr":await scanner?.capture();break;
    case "stop-camera":scanner?.stop();break;
    case "rescan":closeModal();await scanner?.start();break;
    case "request":handoffTo(isAdmin()?"/admin/requests":"/requests",{bikeId:id,create:true});break;
    case "show-qr":{
-    const data=await api.qr(id,admin), parsed=parseQr(data.url,cfg.publicOrigin||location.origin);
-    if(parsed.kind!=="b")throw Error("Некорректный QR велосипеда.");
-    const qr=window.qrcode(0,"M");qr.addData(data.url);qr.make();
-    modal("QR велосипеда",'<div class="qr-image">'+qr.createSvgTag({cellSize:5,margin:4,scalable:true})+'</div><p class="break-all">'+e(data.url)+'</p>'+action("download-qr","Скачать QR","primary"));
+    const data=await api.qr(id,admin);
+    const imageUrl=api.serverUrl(data.image_url),downloadUrl=api.serverUrl(data.download_url||data.image_url);
+    modal("QR велосипеда",'<div class="qr-image"><img src="'+e(imageUrl)+'" alt="QR велосипеда, полученный от сервера"></div>'+action("download-qr","Скачать QR","primary",'data-url="'+e(downloadUrl)+'"'));
     break;
    }
-   case "download-qr":{const svg=dialog.querySelector("svg");if(!svg)break;const url=URL.createObjectURL(new Blob([svg.outerHTML],{type:"image/svg+xml"}));try{const img=new Image();img.src=url;await img.decode();const canvas=document.createElement("canvas");canvas.width=canvas.height=800;const ctx=canvas.getContext("2d");ctx.fillStyle="white";ctx.fillRect(0,0,800,800);ctx.drawImage(img,0,0,800,800);const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download="bike-qr.png";a.click();}finally{URL.revokeObjectURL(url);}break;}
+   case "download-qr":{const blob=await api.downloadQr(btn.dataset.url);const url=URL.createObjectURL(blob);try{const a=document.createElement("a");a.href=url;a.download="bike-qr.png";a.click();}finally{setTimeout(()=>URL.revokeObjectURL(url),1000);}break;}
    case "edit-bike":{
     const b=await api.bike(id,admin);
     modal("Изменить описание",'<form id="edit-bike-form" data-id="'+e(id)+'" data-admin="'+admin+'" class="stack">'+formError()+'<label>Модель<input name="model" required maxlength="120" value="'+e(b.model)+'"></label><label>Цвет<input name="color" required maxlength="80" value="'+e(b.color)+'"></label><label>Особые приметы (необязательно)<textarea name="special_marks" maxlength="500">'+e(b.special_marks)+'</textarea></label><button type="submit" class="primary">Сохранить</button></form>');break;

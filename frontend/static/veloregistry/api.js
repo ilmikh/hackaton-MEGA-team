@@ -27,9 +27,9 @@ const seed = () => ({
   me:{id:"u1",display_name:"Алина Крылова",contact_type:"telegram",contact_value:"@alina_k",role:"resident"},
   users:[{id:"u2",display_name:"Иван Соколов",contact_type:"telegram",contact_value:"@ivan_s",room_number:"412",dormitory_name:"Гамма",lkp_synced_at:"2026-10-25T09:00:00Z"}],
   bikes:[
-    {id:"b1",public_number:"В-001",owner_id:"u1",model:"Stels Navigator",color:"Сине-белый",special_marks:"Белые крылья",review_state:"approved",status_label:"Зарегистрирован",photo_url:null,qr_token:"demo-bike-001",parking_name:"Гамма — павильон",spot_code:"Г-01"},
-    {id:"b2",public_number:"В-008",owner_id:"u1",model:"Forward",color:"Красный",special_marks:"",review_state:"approved",status_label:"Зарегистрирован",photo_url:null,qr_token:"demo-bike-008",parking_name:null,spot_code:null},
-    {id:"b3",public_number:"В-014",owner_id:"u2",model:"Trek Marlin",color:"Чёрный",review_state:"approved",status_label:"Зарегистрирован",photo_url:null,qr_token:"demo-bike-014",parking_name:"Гамма — павильон",spot_code:"Г-02"}
+    {id:"b1",public_number:"В-001",owner_id:"u1",model:"Stels Navigator",color:"Сине-белый",special_marks:"Белые крылья",review_state:"approved",status_label:"Зарегистрирован",photo_url:null,parking_name:"Гамма — павильон",spot_code:"Г-01"},
+    {id:"b2",public_number:"В-008",owner_id:"u1",model:"Forward",color:"Красный",special_marks:"",review_state:"approved",status_label:"Зарегистрирован",photo_url:null,parking_name:null,spot_code:null},
+    {id:"b3",public_number:"В-014",owner_id:"u2",model:"Trek Marlin",color:"Чёрный",review_state:"approved",status_label:"Зарегистрирован",photo_url:null,parking_name:"Гамма — павильон",spot_code:"Г-02"}
   ]
 });
 let state;
@@ -58,22 +58,36 @@ export const api = {
   async register(form) {
     if (!demo) return request("/me/bikes",{method:"POST",body:form});
     const id = crypto.randomUUID(), file = form.get("photo");
-    const bike={id,public_number:"На проверке",owner_id:state.me.id,model:form.get("model"),color:form.get("color"),special_marks:form.get("special_marks"),review_state:"pending",status_label:"На рассмотрении",qr_token:null,photo_url:file?.size ? await asData(file) : null,requested_spot_id:form.get("target_spot_id"),spot_code:null,parking_name:null};
+    const bike={id,public_number:"На проверке",owner_id:state.me.id,model:form.get("model"),color:form.get("color"),special_marks:form.get("special_marks"),review_state:"pending",status_label:"На рассмотрении",photo_url:file?.size ? await asData(file) : null,requested_spot_id:form.get("target_spot_id"),spot_code:null,parking_name:null};
     state.bikes.push(bike);
     try { save(); } catch(e) { state.bikes.pop(); throw e; } return clone(bike);
   },
-  async lookup(token) {
-    if (!demo) return request("/qr/bikes/"+encodeURIComponent(token));
-    const b=state.bikes.find(x=>x.qr_token===token && x.review_state==="approved"); if(!b)throw new ApiError("QR не найден или регистрация ещё не подтверждена.",404);
-    const owner=b.owner_id===state.me.id ? state.me : state.users.find(x=>x.id===b.owner_id);
-    if(role==="admin") return this.bike(b.id,true);
-    return {public_number:b.public_number,owner:{display_name:owner?.display_name || "Владелец не установлен",contact_type:owner?.contact_type,contact_value:owner?.contact_value}};
+  serverUrl(value) {
+    if(typeof value!=="string"||!value)throw new ApiError("Сервер не вернул изображение QR.");
+    const url=new URL(value,location.origin);
+    if(url.origin!==location.origin || !/^https?:$/.test(url.protocol))throw new ApiError("Ожидался адрес файла с текущего сервера.");
+    return url.href;
   },
-  async adminLookup(token) { return demo ? this.lookup(token) : request("/admin/qr/bikes/"+encodeURIComponent(token)); },
+  async scanPhoto(photo,admin=false) {
+    if(demo)throw new ApiError("Распознавание QR выполняет бэк. Подключите API для проверки.");
+    const body=new FormData();body.set("photo",photo);
+    return request(admin?"/admin/qr/scan":"/qr/scan",{method:"POST",body});
+  },
+  async resolveQrUrl(url,admin=false) {
+    if(demo)throw new ApiError("Обработку QR-ссылки выполняет бэк. Подключите API для проверки.");
+    return request(admin?"/admin/qr/resolve":"/qr/resolve",{method:"POST",body:{url}});
+  },
   async qr(id,admin=false) {
-    if (!demo) return request((admin?"/admin/bikes/":"/me/bikes/")+encodeURIComponent(id)+"/qr");
-    const b=own(id); if(!b.qr_token)throw new ApiError("QR появится после одобрения регистрации.");
-    return {url:location.origin+"/q/b/"+b.qr_token};
+    if(demo)throw new ApiError("Изображение QR формирует бэк. Подключите API для просмотра.");
+    return request((admin?"/admin/bikes/":"/me/bikes/")+encodeURIComponent(id)+"/qr");
+  },
+  async downloadQr(value) {
+    const url=this.serverUrl(value);
+    let response;try{response=await fetch(url,{credentials:"same-origin",headers:{Accept:"image/png"}});}catch{throw new ApiError("Не удалось скачать QR.");}
+    if(!response.ok)throw new ApiError("Не удалось скачать QR.",response.status);
+    const blob=await response.blob();
+    if(blob.type.split(";")[0]!=="image/png")throw new ApiError("Сервер должен вернуть QR в PNG.");
+    return blob;
   },
   async user(id) {
     if(!demo)return request("/admin/users/"+encodeURIComponent(id));
