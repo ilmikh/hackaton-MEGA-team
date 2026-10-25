@@ -285,6 +285,43 @@
     window.addEventListener('pagehide', clearPreview);
   }
 
+  const bikeSearch = document.querySelector('#admin-bike-search');
+  function searchAdminBikes() {
+    const query = bikeSearch.value.trim().toLocaleLowerCase('ru');
+    const cards = [...document.querySelectorAll('[data-admin-bike]')];
+    for (const card of cards) card.hidden = !card.textContent.toLocaleLowerCase('ru').includes(query);
+    const count = cards.filter(card => !card.hidden).length;
+    document.querySelector('#admin-bike-count').textContent = `Найдено: ${count} из ${cards.length}`;
+    document.querySelector('#admin-bike-empty').hidden = count > 0;
+  }
+  bikeSearch.addEventListener('input', searchAdminBikes);
+  const adminFilter = document.querySelector('#admin-request-filter');
+  function filterAdminRequests() {
+    const rows = [...document.querySelectorAll('[data-admin-request]')];
+    for (const row of rows) row.hidden = adminFilter.value !== 'all' && row.dataset.status !== adminFilter.value;
+    const count = rows.filter(row => !row.hidden).length;
+    document.querySelector('#admin-request-count').textContent = `Заявок: ${count}`;
+    document.querySelector('#admin-request-empty').hidden = count > 0;
+  }
+  adminFilter.addEventListener('change', filterAdminRequests);
+  for (const button of document.querySelectorAll('[data-decision]')) {
+    button.addEventListener('click', () => {
+      const row = button.closest('[data-admin-request]');
+      if (row.dataset.status !== 'pending') return;
+      const comment = row.querySelector('[data-decision-comment]');
+      comment.setCustomValidity(button.dataset.decision === 'rejected' && !comment.value.trim() ? 'Укажите причину отклонения.' : '');
+      if (!comment.reportValidity()) return;
+      row.dataset.status = button.dataset.decision;
+      row.querySelector('[data-decision-status]').textContent = button.dataset.decision === 'approved' ? 'Одобрена' : 'Отклонена';
+      row.querySelector('[data-decision-message]').textContent = 'Демонстрационное решение принято. На сервер не отправлено.';
+      for (const action of row.querySelectorAll('[data-decision]')) action.disabled = true;
+      comment.readOnly = true;
+      filterAdminRequests();
+      if (row.hidden) adminFilter.focus();
+    });
+  }
+  searchAdminBikes();
+  filterAdminRequests();
   document.documentElement.classList.add('js-ready');
   window.addEventListener('hashchange', renderRoute);
   // History/BFCache may restore the DOM with a different fragment.

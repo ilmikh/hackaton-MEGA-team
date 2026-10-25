@@ -43,6 +43,29 @@ const base = process.env.UI_URL || 'http://127.0.0.1:3013';
       .map(link => link.getAttribute('href').slice(1).split('?')[0])
       .filter(id => !document.getElementById(id)));
     assert.deepEqual(missing, []);
+    await route('#page-admin-map');
+    assert.equal(await page.locator('[data-admin-bike]:visible').count(), 3);
+    await page.locator('#admin-bike-search').fill('Forward');
+    assert.equal(await page.locator('[data-admin-bike]:visible').count(), 1);
+    await page.locator('[data-admin-bike]:visible').click();
+    await page.waitForURL('**/#page-admin-bike-008');
+    await route('#page-admin-map');
+    await page.locator('#admin-bike-search').fill('нет такого велосипеда');
+    assert.ok(await page.locator('#admin-bike-empty').isVisible());
+    await page.locator('#admin-bike-search').fill('');
+    await route('#page-admin-requests');
+    await page.locator('#admin-request-filter').selectOption('pending');
+    assert.equal(await page.locator('[data-admin-request]:visible').count(), 1);
+    await page.locator('[data-admin-request]:visible summary').click();
+    await page.locator('[data-admin-request]:visible [data-decision="rejected"]').click();
+    assert.equal(await page.locator('[data-admin-request]:visible').getAttribute('data-status'), 'pending');
+    await page.locator('[data-admin-request]:visible textarea').fill('Место занято');
+    await page.locator('[data-admin-request]:visible [data-decision="rejected"]').click();
+    assert.ok(await page.locator('#admin-request-empty').isVisible());
+    await page.locator('#admin-request-filter').selectOption('rejected');
+    assert.equal(await page.locator('[data-admin-request]:visible').count(), 2);
+    await page.reload();
+    assert.equal(await page.locator('[data-admin-request][data-status="pending"]').count(), 1);
 
     // Every screen/deep link, including dialogs, has exactly one visible owner page.
     const routes = await page.locator('.view, .modal-target').evaluateAll(items => items.map(item => item.id));
