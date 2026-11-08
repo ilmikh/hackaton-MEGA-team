@@ -1,6 +1,6 @@
 {
   "name": "veloregistry-static",
   "private": true,
-  "scripts": { "start": "node tools/serve.cjs" },
+  "scripts": { "start": "node tools/run.cjs", "preview": "node tools/serve.cjs" },
   "engines": { "node": ">=18" }
 }

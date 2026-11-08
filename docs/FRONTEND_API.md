@@ -1,80 +1,38 @@
-# Подключение фронтенда
+# Работающий API и фронт
 
-## Граница ответственности
+Рабочая точка входа — FastAPI /, npm start на 8010. Node только запускает Uvicorn.
+npm run preview на 3000 оставлен для автономного исходного макета; там нет реальной авторизации и хранения.
+В рабочем HTML демо-скрипты исключены, загружается live.js.
 
-Это HTML/CSS/Vanilla JS. В проект не добавлены серверные endpoints, БД, настоящая авторизация или сохранение данных. `npm start` только раздаёт файлы.
+Сессия — HttpOnly cookie velo_session. CSRF приходит в JSON /api/me и передаётся в X-CSRFToken при записи.
+Роль и владелец всегда из сессии. Логин не изменяется, саморегистрация не даёт admin.
 
-По умолчанию вход/регистрация/смена пароля — явно подписанный демосценарий. При регистрации поля `last_name`, `first_name`, `username` (Telegram), `password`; после проверки обязательных полей открывается `#page-profile`. Данные живут только в DOM текущей вкладки. Пароль не проверяется и не сохраняется. Остальные действия сохранения отключены до подключения API.
+## Endpoints
+- POST /api/auth/register — username, password, name.
+- POST /api/auth/login — username, password.
+- POST /api/auth/logout — завершить сессию.
+- GET/PATCH /api/me — профиль; PATCH только name, phone.
+- POST /api/me/password — current, password; отзывает все сессии.
+- GET /api/bikes — свои; админу весь реестр. q: модель/цвет/номер; UI ищет также место/владельца.
+- POST /api/bikes — multipart photo, model, color, marks, spot_id.
+- GET/PATCH /api/bikes/{id} — карточка/описание.
+- GET /api/bikes/{id}/photo — фото с проверкой прав.
+- GET /api/parkings — схема и счётчики.
+- GET /api/parkings/{id}/spots — жильцу свободные; админу полные строки.
+- POST /api/admin/parkings — name, description, x, y, capacity.
+- POST /api/admin/bikes/{id}/placement — spot_id либо null.
+- PATCH /api/admin/bikes/{id}/status — registered/donated/withdrawn/scrapped.
+- PATCH /api/admin/bikes/{id}/owner — username получателя.
+- GET/POST /api/requests — список/создание.
+- POST /api/requests/{id}/cancel — своя ожидающая заявка.
+- POST /api/admin/requests/{id}/decision — state approved/rejected и comment.
+- GET /api/admin/events — журнал.
+- Жильцы/даты/напоминания/документы — BACKEND_EXTRAS.md.
+- QR — QR_BACKEND.md.
 
-## Формы
+Заявка kind: register/place/move/release/donate/withdraw/transfer.
+Для place/move нужен spot_id, для transfer — recipient (логин).
+Велосипед имеет review отдельно от учётного status. Неактивному велосипеду нельзя назначить место через старую заявку.
+Переходы и макет не являются проверкой прав. Все значения SQL параметризованы; HTML из пользовательских полей экранируется.
 
-Каждая форма имеет `data-form` и `data-ui-only`. `window.Veloregistry.connectForm(name, options)` подключает клиентский fetch к реальному endpoint, убирает деморежим у этой формы и включает submit. Адреса и DTO согласуются с бэком: в коде нет заранее выбранных URL авторизации.
-
-| data-form | Поля |
-|---|---|
-| account-login | username, password |
-| account-register | last_name, first_name, username, password |
-| account-settings | current_password, new_password, password_confirm (только для проверки интерфейса) |
-| profile | display_name, phone, telegram |
-| bike-register | photo, model, color, special_marks, target_spot_id |
-| bike-edit / admin-bike-edit | model, color, special_marks; bike_id из выбранной карточки |
-| request-create | request_type (place/move/release), bike_id, target_spot_id, comment |
-
-`password_confirm` и отображаемый `spot_code` не отправляются. При освобождении поля места отключены. В форме смены пароля новый пароль обязателен; изменение логина отсутствует. Владелец и роль определяются сессией на сервере.
-
-Пример после согласования URL и ответа:
-
-```js
-// Выполняется после загрузки HTML. endpoint и renderServerSession передаёт интеграция.
-const disconnect = Veloregistry.connectForm('account-login', {
-  url: endpoint,
-  method: 'POST',
-  csrfToken,
-  onSuccess: renderServerSession,
-});
-```
-
-Опции: `url` — строка или функция `(form) => url` (полезно для bike_id); `method` — POST/PATCH/PUT/DELETE; `encoding` — `json` по умолчанию, `form-data` обязательно для регистрации велосипеда с фото. JSON передаётся с Content-Type application/json, файлы — FormData с границей браузера. Cookies отправляются только своему origin. Для другой серверной схемы нужен согласованный адаптер.
-
-Результат: 2xx вызывает `onSuccess(data, form)` и событие `veloregistry:success`; 204 поддерживается. Ошибки JSON (`detail`, `message`, массив ошибок FastAPI), сети и таймаут показываются в форме. Повторная отправка на время запроса блокируется. Автоматического повтора нет. Callback отображает согласованный ответ и выбирает дальнейший экран; клиент не выдумывает успешную авторизацию или права. Возвращённая функция отключает подключение.
-
-## Карта второго разработчика
-
-Ссылки открывают `#page-map?from=page-register` или `#page-map?from=requests-new&bike=…`. Кнопка «Вернуться к форме» возвращает в нужную форму. Переходы не пересоздают DOM, поэтому незавершённый ввод сохраняется до перезагрузки.
-
-Карта передаёт выбранное реальное место:
-
-```js
-Veloregistry.setSelectedSpot('bike-register', { id: spot.id, label: spot.code });
-// Для заявки: setSelectedSpot('request-create', ...).
-```
-
-ID попадает в hidden `target_spot_id`, подпись — в интерфейс. Сервер повторно проверяет свободность и принадлежность. Карта реализована в parking.js по предоставленному плану. ID p1–p10 и их места являются демонстрационными; при интеграции заменить данными сервера.
-
-## Навигация и данные
-
-`#page-…` — экраны, фрагменты окон содержат ID dialog. `?bike=b1/b2` внутри hash выбирает пример велосипеда; после интеграции идентификаторы и содержимое карточек заменяются реальными. `data-bike-field` — источник полей для редактора, `data-nav` задаёт активный пункт меню. Административный переключатель внизу — только просмотр макета, не выдача прав.
-
-Реальные данные админа нельзя вставлять в HTML жильца и просто скрывать. Бэк проверяет сессию, CSRF, роль, принадлежность, тип/размер файла, место и операции. Пароль не сохраняется во фронтенде; localStorage/sessionStorage не используются.
-
-## Проверка
-
-`node tools/check-ui.cjs` проверяет интерфейс в Edge, включая JSON-запрос и ответы через перехват Playwright. Это клиентская проверка, не подтверждение работы настоящего API или входа.
-
-## Административные экраны
-
-`#page-admin-map` теперь показывает список всех демонстрационных велосипедов без карты. Поиск работает по номеру, модели, цвету, владельцу и контакту; каждая карточка ведёт к своему экрану. `#page-admin-requests` содержит фильтр по состоянию и подробности. Кнопки решения меняют только DOM: отклонение требует причины, повторное решение отключено. После перезагрузки восстанавливаются примеры. Запросы API не выполняются; реальные решения, список и права подключаются отдельно.
-
-Профиль содержит отдельные поля phone и telegram; Telegram вводится с @. Административного экрана собственного профиля нет, вход в административный макет ведёт к реестру велосипедов.
-
-## Фото QR
-
-Формы `qr-scan` (жилец) и `admin-qr-scan` (администратор) содержат файл `photo`. Снимок с видеопотока, фото штатной камерой телефона и файл с диска попадают в одно поле. Дополнительное `camera_photo` не отправляется. Приём: JPEG/PNG/WebP до 20 МБ на фронте; сервер повторно проверяет файл.
-
-После появления реального URL подключить `Veloregistry.connectForm('qr-scan', { url: endpoint, encoding: 'form-data', onSuccess: renderQrResponse })`, аналогично для администратора. Ответ и права определяет сервер; callback отображает согласованный DTO. Пока URL не настроен, кнопка отправки отключена. Код на устройстве только делает снимок, никакого локального декодера нет.
-
-Камера требует HTTPS либо localhost. Поток останавливается после снимка, по кнопке, при уходе со страницы, скрытии вкладки и закрытии. Для файла действует предпросмотр. Фото не сохраняются в localStorage/sessionStorage и не отправляются автоматически.
-
-## Полноэкранный вход
-
-`#account-login` и `#account-register` — отдельные article.view, а не dialog. Меню приложения скрывается на этих страницах. При уходе с них пароль очищается. Контакты профиля остаются отдельными полями phone/telegram, логин в настройках не редактируется.
+ЛКП-интеграция и внешние рассылки не входят в согласованный объём. Напоминание показывается в личном кабинете.
